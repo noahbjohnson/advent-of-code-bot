@@ -134,6 +134,7 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
 
   if (updatedMembers.length > 0) {
     console.info("one or more updated members found")
+    console.log(JSON.stringify(updatedMembers))
 
     for (const member of updatedMembers) {
       const starDiff = member.new.stars - member.old.stars
