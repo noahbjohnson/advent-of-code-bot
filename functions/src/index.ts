@@ -58,8 +58,8 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
 
   const newMembers: Array<MemberDoc> = []
   const updatedMembers: Array<{
-    old: MemberDoc
-    new: MemberDoc
+    name: string
+    newStars: number
   }> = []
 
   const memberHandlers: Array<Promise<void>> = []
@@ -95,8 +95,8 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
         if (memberData.last_star < docData.last_star) {
           await memberDoc.ref.update(flatten(docData))
           updatedMembers.push({
-            old: memberData,
-            new: (await memberDoc.ref.get()).data() as MemberDoc
+            name: docData.name,
+            newStars: docData.stars - memberData.stars
           })
         }
       } else {
@@ -137,10 +137,10 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
     console.log(JSON.stringify(updatedMembers))
 
     for (const member of updatedMembers) {
-      const starDiff = member.new.stars - member.old.stars
-      if (starDiff > 0) {
+      if (member.newStars > 0) {
+        console.info(`sending star notification for ${member.name}`)
         await webhook.send({
-          text: `:star2: ${member.new.name} got ${starDiff > 1 ? `${starDiff} new stars` : 'a new star'}!`
+          text: `:star2: ${member.name} got ${member.newStars > 1 ? `${member.newStars} new stars` : 'a new star'}!`
         })
       }
     }
