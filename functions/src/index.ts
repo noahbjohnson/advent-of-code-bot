@@ -35,7 +35,7 @@ type MemberDoc = {
   completion: Completion
 }
 
-export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async (context: functions.EventContext): Promise<void> => {
+export const pollAPI = functions.pubsub.schedule('every 2 hours').onRun(async (context: functions.EventContext): Promise<void> => {
   console.log('checking API')
   const response = await axios.create({
     headers: {

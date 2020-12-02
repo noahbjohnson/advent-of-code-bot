@@ -7,3 +7,7 @@ Should be super easy to deploy:
 - run `firebase init` and select your intented target project
 - Add your secrets to `set_env.sh` and run it `sh set_env.sh`
 - run `firebase deploy`
+
+## Change interval
+
+Just alter `'every 2 hours'` in [functions/index.ts]() to your desired update interval.
