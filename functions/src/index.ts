@@ -144,6 +144,9 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
         })
       }
     }
+
+    // TODO: leaderboard report
+    
   } else {
     console.info("no updated members")
   }
