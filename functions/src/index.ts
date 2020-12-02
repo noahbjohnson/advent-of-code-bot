@@ -124,9 +124,9 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
       memberString += member.name
     })
 
-    console.info("sending new member welcom to slack")
+    console.info("sending new member welcome to slack")
     await webhook.send({
-      text: `Please welcome new member${newMembers.length > 0 ? 's' : ''}: ${memberString} to the leaderboard! :wave:`
+      text: `Please welcome new member${newMembers.length > 1 ? 's' : ''}: ${memberString} to the leaderboard! :wave:`
     })
   } else {
     console.info("no new members")
