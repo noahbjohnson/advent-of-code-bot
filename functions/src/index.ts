@@ -94,7 +94,10 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
         const memberData = memberDoc.data() as MemberDoc
         if (memberData.last_star < docData.last_star) {
           await memberDoc.ref.update(flatten(docData))
-          updatedMembers.push((await memberDoc.ref.get()).data() as MemberDoc)
+          updatedMembers.push({
+            old: memberData,
+            new: (await memberDoc.ref.get()).data() as MemberDoc
+          })
         }
       } else {
         await memberDoc.ref.set(docData)
@@ -136,7 +139,7 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
       const starDiff = member.new.stars - member.old.stars
       if (starDiff > 0) {
         await webhook.send({
-          text: `${member.new.name} got ${starDiff > 1 ? `${starDiff} new stars` : 'a new star'}!`
+          text: `:star2: ${member.new.name} got ${starDiff > 1 ? `${starDiff} new stars` : 'a new star'}!`
         })
       }
     }
