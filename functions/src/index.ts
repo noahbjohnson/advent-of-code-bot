@@ -57,6 +57,7 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
   const webhook = new IncomingWebhook(functions.config().slack.url);
 
   const newMembers: Array<MemberDoc> = []
+  const apiMembers : Array<MemberDoc> = []
   const updatedMembers: Array<{
     name: string
     newStars: number
@@ -89,6 +90,7 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
         global_score,
         completion
       }
+      apiMembers.push(docData)
 
       if (memberDoc.exists) {
         const memberData = memberDoc.data() as MemberDoc
@@ -144,10 +146,11 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
         })
       }
     }
-
-    // TODO: leaderboard report
-
   } else {
     console.info("no updated members")
   }
+
+  // TODO: leaderboard report
+  // TODO: cleanup when a user leaves
+
 })
