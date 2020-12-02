@@ -92,7 +92,7 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
 
       if (memberDoc.exists) {
         const memberData = memberDoc.data() as MemberDoc
-        if (memberData.last_star < docData.last_star) {
+        if (memberData.stars < docData.stars) {
           await memberDoc.ref.update(flatten(docData))
           updatedMembers.push({
             name: docData.name,
@@ -146,7 +146,7 @@ export const pollAPI = functions.pubsub.schedule('every 15 minutes').onRun(async
     }
 
     // TODO: leaderboard report
-    
+
   } else {
     console.info("no updated members")
   }
