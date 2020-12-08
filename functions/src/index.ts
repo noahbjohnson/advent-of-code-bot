@@ -33,7 +33,52 @@ type MemberDoc = {
   local_score: number
   global_score: number
   completion: Completion
+  deleted: boolean
 }
+
+/**
+ * Call the api and then go through all the member documents in the collection updating if they're deleted or not
+ */
+export const flagDeleted = functions.pubsub.schedule('every 2 hours').onRun(async (context: functions.EventContext): Promise<void> => {
+  const response = await axios.create({
+    headers: {
+      "Cookie": functions.config().advent.cookie
+    }
+  }).get(`https://adventofcode.com/${functions.config().advent.year}/leaderboard/private/view/${functions.config().advent.team}.json`)
+  if (response.status > 200) {
+    console.error("error in calling advent server", response)
+    throw new Error(response.statusText)
+  }
+
+  const data = response.data as {
+    members: { [key: string]: Imember }
+    owner_id: string
+    event: string
+  }
+
+  const ids: string[] = []
+  for (const key of Object.keys(data.members)) {
+    if (!ids.includes(key)) {
+      ids.push(key)
+    }
+  }
+
+  const firestoreClient = firestore()
+
+  const members = await firestoreClient.collection("members").get()
+  for (const doc of members.docs) {
+    const docData = doc.data() as MemberDoc
+    if (!ids.includes(docData.id.toString())) {
+      await doc.ref.update({
+        deleted: true
+      })
+    } else {
+      await doc.ref.update({
+        deleted: false
+      })
+    }
+  }
+})
 
 export const pollAPI = functions.pubsub.schedule('every 2 hours').onRun(async (context: functions.EventContext): Promise<void> => {
   console.log('checking API')
@@ -57,7 +102,7 @@ export const pollAPI = functions.pubsub.schedule('every 2 hours').onRun(async (c
   const webhook = new IncomingWebhook(functions.config().slack.url);
 
   const newMembers: Array<MemberDoc> = []
-  const apiMembers : Array<MemberDoc> = []
+  const apiMembers: Array<MemberDoc> = []
   const updatedMembers: Array<{
     name: string
     newStars: number
@@ -88,7 +133,8 @@ export const pollAPI = functions.pubsub.schedule('every 2 hours').onRun(async (c
         stars,
         local_score,
         global_score,
-        completion
+        completion,
+        deleted: false
       }
       apiMembers.push(docData)
 
@@ -119,7 +165,7 @@ export const pollAPI = functions.pubsub.schedule('every 2 hours').onRun(async (c
     newMembers.forEach((member, i) => {
       if (i > 0) {
         memberString += " , "
-        if (i === newMembers.length -1){
+        if (i === newMembers.length - 1) {
           memberString += "and "
         }
       }
