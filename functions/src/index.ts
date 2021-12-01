@@ -36,10 +36,60 @@ type MemberDoc = {
   deleted: boolean
 }
 
+type MemberReportEntry = {
+  name: string
+  id: number
+  stars: number
+  local_score: number
+}
+
+type Report = {
+  time: Date
+  members: Array<MemberReportEntry>
+}
+
+const collection_name = "members_2021"
+const reports_name = "reports_2021"
+
+export const generateReport = functions.pubsub.schedule('5 */2 * * *').onRun(async (context: functions.EventContext) => {
+  const firestoreClient = firestore()
+
+  // get non-deleted members
+  const members = await firestoreClient.collection(collection_name).get()
+  const activeMembers: Array<MemberDoc> = []
+  for (const doc of members.docs) {
+    const docData = doc.data() as MemberDoc
+    if (!docData.deleted) {
+      activeMembers.push(docData)
+    }
+  }
+
+  // create report obj for each
+  const memberReports: Array<MemberReportEntry> = []
+  for (const member of activeMembers) {
+    memberReports.push({
+      name: member.name,
+      id: member.id,
+      local_score: member.local_score,
+      stars: member.stars
+    })
+  }
+  
+  // sort members
+  memberReports.sort((a, b) => a.local_score = b.local_score)
+  
+  // create report
+  const report: Report = {
+    time: new Date(),
+    members: memberReports
+  }
+  await firestoreClient.collection(reports_name).add(report)
+})
+
 /**
  * Call the api and then go through all the member documents in the collection updating if they're deleted or not
  */
-export const flagDeleted = functions.pubsub.schedule('every 2 hours').onRun(async (context: functions.EventContext): Promise<void> => {
+export const flagDeleted = functions.pubsub.schedule('3 */2 * * *').onRun(async (context: functions.EventContext): Promise<void> => {
   const response = await axios.create({
     headers: {
       "Cookie": functions.config().advent.cookie
@@ -65,7 +115,7 @@ export const flagDeleted = functions.pubsub.schedule('every 2 hours').onRun(asyn
 
   const firestoreClient = firestore()
 
-  const members = await firestoreClient.collection("members").get()
+  const members = await firestoreClient.collection(collection_name).get()
   for (const doc of members.docs) {
     const docData = doc.data() as MemberDoc
     if (!ids.includes(docData.id.toString())) {
@@ -80,7 +130,10 @@ export const flagDeleted = functions.pubsub.schedule('every 2 hours').onRun(asyn
   }
 })
 
-export const pollAPI = functions.pubsub.schedule('every 2 hours').onRun(async (context: functions.EventContext): Promise<void> => {
+/**
+ * Update the firestore database from the api
+ */
+export const pollAPI = functions.pubsub.schedule('0 */2 * * *').onRun(async (context: functions.EventContext): Promise<void> => {
   console.log('checking API')
   const response = await axios.create({
     headers: {
@@ -111,7 +164,7 @@ export const pollAPI = functions.pubsub.schedule('every 2 hours').onRun(async (c
   const memberHandlers: Array<Promise<void>> = []
   for (const [id, member] of Object.entries(data.members)) {
     memberHandlers.push(new Promise(async (resolve) => {
-      const memberDoc = await firestoreClient.doc("members/" + id).get()
+      const memberDoc = await firestoreClient.doc(collection_name + "/" + id).get()
       const { stars, local_score, global_score, name } = member
 
       const completion: Completion = {}
