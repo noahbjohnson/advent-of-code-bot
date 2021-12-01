@@ -3,7 +3,9 @@ import axios from 'axios';
 import { firestore } from 'firebase-admin';
 import { flatten } from 'flatten-anything'
 require('firebase-admin').initializeApp();
-import { IncomingWebhook } from '@slack/webhook';
+import { IncomingWebhook, IncomingWebhookSendArguments } from '@slack/webhook';
+import { HeaderBlock, SectionBlock } from '@slack/types';
+
 
 interface Imember {
   name: string
@@ -55,10 +57,11 @@ export const generateReport = functions.pubsub.schedule('5 */2 * * *').onRun(asy
   const firestoreClient = firestore()
 
   // get non-deleted members
-  const members = await firestoreClient.collection(collection_name).get()
+  const members = await firestoreClient.collection(collection_name).listDocuments()
   const activeMembers: Array<MemberDoc> = []
-  for (const doc of members.docs) {
-    const docData = doc.data() as MemberDoc
+  for (const doc of members) {
+    const docSnapshot = await doc.get()
+    const docData = docSnapshot.data() as MemberDoc
     if (!docData.deleted) {
       activeMembers.push(docData)
     }
@@ -74,10 +77,6 @@ export const generateReport = functions.pubsub.schedule('5 */2 * * *').onRun(asy
       stars: member.stars
     })
   }
-  
-  // sort members
-  memberReports.sort((a, b) => a.local_score = b.local_score)
-  
   // create report
   const report: Report = {
     time: new Date(),
@@ -252,4 +251,57 @@ export const pollAPI = functions.pubsub.schedule('0 */2 * * *').onRun(async (con
   // TODO: leaderboard report
   // TODO: cleanup when a user leaves
 
+})
+
+export const sendReport = functions.pubsub.schedule('7 23 * * *').onRun(async (context: functions.EventContext) => {
+  const firestoreClient = firestore()
+
+  // get latest report
+  const latestReport = await firestoreClient.collection(reports_name).orderBy('time', 'desc').limit(1).get()
+  const reportData = latestReport.docs[0].data() as Report
+
+  reportData.members.sort((a, b) => b.local_score - a.local_score)
+
+  const header: HeaderBlock = {
+    type: 'header',
+    text: {
+      type: 'plain_text',
+      text: ":randy_christmas: Randy's Nice List :randy_christmas:",
+      emoji: true
+    }
+  }
+
+  let membersText: string = ``
+  reportData.members.forEach((member, i) => {
+      switch (i + 1) {
+        case 1:
+          membersText += ':first_place_medal:  '
+          break
+        case 2:
+          membersText += ':second_place_medal:  '
+          break
+        case 3:
+          membersText += ':third_place_medal:  '
+          break
+        default:
+          membersText += ':christmas_tree:  '
+          break
+
+      }
+      membersText += `*${member.name}* (points: ${member.local_score}, stars: ${member.stars})\n`
+  });
+
+  const body: SectionBlock = {
+    type: 'section',
+    text: {
+      type: 'mrkdwn',
+      text: membersText
+    }
+  }
+
+  const webhookPayload: IncomingWebhookSendArguments = {blocks: [header, body]}
+  
+  const webhook = new IncomingWebhook(functions.config().slack.url)
+
+  await webhook.send(webhookPayload)
 })
